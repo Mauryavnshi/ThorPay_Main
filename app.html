@@ -179,42 +179,54 @@
   <div class="panel" id="panel-bridge">
     <h2>Bridge (CCTP)</h2>
     <div class="field">
-      <div class="flabel">From</div>
+      <div class="flabel">From <span id="bridgeFromNet" class="net-hint"></span></div>
       <div class="row">
         <input type="number" id="bridgeFromAmt" placeholder="0.00" min="0" step="0.000001" />
-        <select id="bridgeFromToken"><option value="USDC">USDC</option></select>
+        <button type="button" class="btn btn-mini" id="bridgeMax">Max</button>
       </div>
-      <div class="balrow"><span id="bridgeFromBal">Balance: 0.00</span></div>
-      <select id="bridgeFromChain" style="margin-top:8px;width:100%;">
+      <div class="balrow">
+        <span id="bridgeFromBal">Balance: 0.00</span>
+        <span id="bridgeFromNetUsdc" class="net-hint"></span>
+      </div>
+      <select id="bridgeFromChain" class="net-select">
         <option value="arc">Arc Testnet</option>
       </select>
+      <input type="hidden" id="bridgeFromToken" value="USDC" />
     </div>
-    <div class="swap-arrow">→</div>
+    <div class="swap-arrow swap-arrow-btn" id="bridgeFlip" title="Swap direction">⇅</div>
     <div class="field">
-      <div class="flabel">To</div>
+      <div class="flabel">To <span id="bridgeToNet" class="net-hint"></span></div>
       <div class="row"><input type="text" id="bridgeToAmt" placeholder="0.00" disabled /><span>USDC</span></div>
-      <select id="bridgeToChain" style="margin-top:8px;width:100%;">
+      <div class="balrow">
+        <span id="bridgeToBal">Connect your wallet to see this balance</span>
+        <span id="bridgeToNetUsdc" class="net-hint"></span>
+      </div>
+      <select id="bridgeToChain" class="net-select">
         <option value="ethSepolia">Ethereum Sepolia</option>
         <option value="baseSepolia">Base Sepolia</option>
       </select>
-      <div class="balrow"><span id="bridgeToBal">Connect your wallet to see this balance</span></div>
+      <input type="hidden" id="bridgeToToken" value="USDC" />
     </div>
     <div class="route-box">
+      <div class="rline"><span>Route</span><span id="bridgeRouteLine"></span></div>
       <div class="rline"><span>Protocol</span><span>Circle CCTP V2</span></div>
-      <div class="rline"><span>Steps</span><span>Approve → Burn (Arc) → Attestation → Mint (destination)</span></div>
+      <div class="rline"><span>Steps</span><span>Approve → Burn (source) → Attestation → Mint (destination)</span></div>
     </div>
+    <div class="eth-note">USDC-only bridging. CCTP moves <b>USDC</b>, not native ETH — there is no official CCTP native-ETH bridge on these testnets.</div>
     <button class="btn btn-primary btn-block" id="bridgeBtn">Connect wallet to bridge</button>
     <button class="btn btn-primary btn-block" id="bridgeMintBtn" style="display:none;margin-top:8px;">Complete mint on destination chain</button>
     <button class="btn btn-block" id="bridgeRetryBtn" style="display:none;margin-top:8px;">Check attestation again</button>
     <div class="status" id="bridgeStatus"></div>
     <div class="hint" id="bridgeProgress" style="display:none;"></div>
     <!--
-      This burns real USDC on Arc Testnet through Circle's TokenMessengerV2, waits for
-      Circle's Iris attestation, then — once you click "Complete mint" — switches MetaMask
-      to your destination chain and calls receiveMessage on that chain's MessageTransmitterV2
-      for you. CCTP V2 testnet contracts share the same address across chains (verified on
-      Ethereum Sepolia and Base Sepolia). MetaMask briefly switches networks during the mint
-      step, then switches back.
+      Bridges real USDC through Circle's CCTP V2 (TokenMessengerV2 / MessageTransmitterV2)
+      in BOTH directions between Arc Testnet and Arbitrum Sepolia / Base Sepolia /
+      Ethereum Sepolia. Choose any supported From/To pair, waits for Circle's Iris
+      attestation, then — once you click "Complete mint" — switches MetaMask to the
+      destination chain and calls receiveMessage for you. CCTP V2 testnet contracts share
+      the same address across all four chains (verified against Circle's official docs).
+      MetaMask briefly switches networks during the mint step, then switches back. USDC-only:
+      CCTP does not bridge native ETH.
     -->
   </div>
 

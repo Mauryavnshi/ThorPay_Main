@@ -45,7 +45,8 @@ const CONFIG = {
       usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
       // cirBTC on Sepolia — not wired into the Bridge flow yet (Bridge only moves
       // USDC through CCTP right now); kept here so it's easy to plug in later.
-      cirbtc: "0x3a3fe695F684Bf9b9e43CF43C2b895Ea5e392bB3"
+      cirbtc: "0x3a3fe695F684Bf9b9e43CF43C2b895Ea5e392bB3",
+      minFinalityThreshold: 1000 // confirmed/Fast — avoids 13-15min finalized waits on Sepolia
     },
     baseSepolia: {
       name: "Base Sepolia", domain: 6,
@@ -53,9 +54,102 @@ const CONFIG = {
       rpcUrls: ["https://sepolia.base.org"],
       blockExplorerUrls: ["https://sepolia.basescan.org"],
       nativeCurrency: { name: "Sepolia ETH", symbol: "ETH", decimals: 18 },
-      usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+      usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      minFinalityThreshold: 1000
+    },
+    arbSepolia: {
+      name: "Arbitrum Sepolia", domain: 3,
+      chainIdHex: "0x66EEE",
+      rpcUrls: ["https://sepolia-rollup.arbitrum.io/rpc"],
+      blockExplorerUrls: ["https://sepolia.arbiscan.io"],
+      nativeCurrency: { name: "Sepolia ETH", symbol: "ETH", decimals: 18 },
+      usdc: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
+      explorerTx: (txHash) => "https://sepolia.arbiscan.io/tx/" + txHash,
+      minFinalityThreshold: 1000
     }
-  }
+  },
+
+  // Unified network configuration used by the Bridge (all four supported testnets).
+  // A single object is shared across the From and To selectors so any supported
+  // route can be picked. Addresses are the OFFICIAL Circle/Arc testnet values:
+  //   - CCTP TokenMessengerV2 / MessageTransmitterV2 are CREATE2-deployed at the
+  //     SAME address on every supported testnet (verified on Arc, Ethereum Sepolia,
+  //     Base Sepolia and Arbitrum Sepolia per Circle's CCTP contract-addresses docs).
+  //   - USDC token addresses per Circle's official usdc-contract-addresses docs.
+  //   - CCTP domain IDs per Circle's supported-chains-and-domains docs.
+  networks: {
+    arc: {
+      key: "arc",
+      name: "Arc Testnet",
+      domain: 26,
+      chainIdHex: "0x4CEF52",
+      rpcUrls: ["https://rpc.testnet.arc.network"],
+      blockExplorerUrls: ["https://testnet.arcscan.app"],
+      nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 }, // Arc's native gas token IS USDC
+      tokenMessenger: "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+      messageTransmitter: "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275",
+      usdc: "0x3600000000000000000000000000000000000000",
+      nativeGasIsUsdc: true,
+      minFinalityThreshold: 2000, // Arc = instant finality; must use 2000 for IRIS to attest
+      explorerTx: (txHash) => "https://testnet.arcscan.app/tx/" + txHash
+    },
+    arbSepolia: {
+      key: "arbSepolia",
+      name: "Arbitrum Sepolia",
+      domain: 3,
+      chainIdHex: "0x66EEE",
+      rpcUrls: ["https://sepolia-rollup.arbitrum.io/rpc"],
+      blockExplorerUrls: ["https://sepolia.arbiscan.io"],
+      nativeCurrency: { name: "Sepolia ETH", symbol: "ETH", decimals: 18 },
+      tokenMessenger: "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+      messageTransmitter: "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275",
+      usdc: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
+      nativeGasIsUsdc: false,
+      minFinalityThreshold: 1000,
+      explorerTx: (txHash) => "https://sepolia.arbiscan.io/tx/" + txHash
+    },
+    baseSepolia: {
+      key: "baseSepolia",
+      name: "Base Sepolia",
+      domain: 6,
+      chainIdHex: "0x14a34",
+      rpcUrls: ["https://sepolia.base.org"],
+      blockExplorerUrls: ["https://sepolia.basescan.org"],
+      nativeCurrency: { name: "Sepolia ETH", symbol: "ETH", decimals: 18 },
+      tokenMessenger: "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+      messageTransmitter: "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275",
+      usdc: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      nativeGasIsUsdc: false,
+      minFinalityThreshold: 1000,
+      explorerTx: (txHash) => "https://sepolia.basescan.org/tx/" + txHash
+    },
+    ethSepolia: {
+      key: "ethSepolia",
+      name: "Ethereum Sepolia",
+      domain: 0,
+      chainIdHex: "0xaa36a7",
+      rpcUrls: ["https://ethereum-sepolia-rpc.publicnode.com"],
+      blockExplorerUrls: ["https://sepolia.etherscan.io"],
+      nativeCurrency: { name: "Sepolia ETH", symbol: "ETH", decimals: 18 },
+      tokenMessenger: "0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA",
+      messageTransmitter: "0xE737e5cEBEEBa77EFE34D4aa090756590b1CE275",
+      usdc: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+      nativeGasIsUsdc: false,
+      minFinalityThreshold: 1000,
+      explorerTx: (txHash) => "https://sepolia.etherscan.io/tx/" + txHash
+    }
+  },
+
+  // Valid Bridge routes. Every pair here is a supported Circle CCTP direction.
+  // Format: { from: <networkKey>, to: <networkKey> }
+  bridgeRoutes: [
+    { from: "arc", to: "arbSepolia" },
+    { from: "arbSepolia", to: "arc" },
+    { from: "arc", to: "baseSepolia" },
+    { from: "baseSepolia", to: "arc" },
+    { from: "arc", to: "ethSepolia" },
+    { from: "ethSepolia", to: "arc" }
+  ]
 };
 
 const ERC20_ABI = [
@@ -79,6 +173,17 @@ let history = [];
 let latestBalances = { USDC: null, EURC: null, CIRBTC: null };
 let pendingMint = null;
 let pendingBurn = null; // { txHash, dest, amt } — set when attestation isn't ready yet, so "Check attestation again" can retry without re-burning
+
+// Bridge — the currently selected source network key (arc | arbSepolia | baseSepolia | ethSepolia)
+let bridgeFromKey = "arc";
+// Per-network USDC balances keyed by network key (arc, arbSepolia, baseSepolia, ethSepolia).
+// Kept separate so the Bridge's From-balance reflects the selected source chain and is never
+// confused with the Arc-only balances shown on the dashboard balance-card.
+let bridgeNetworkBalances = {};
+
+function networkByKey(key) {
+  return CONFIG.networks[key] || CONFIG.networks.arc;
+}
 
 /* -------------------------------------------------------------------------
    Formatting — never show a negative balance. Values under 1 keep enough
@@ -161,7 +266,8 @@ async function connectWallet() {
     await checkNetwork();
     loadHistory();
     await refreshBalances();
-    await refreshDestinationBalance();
+    // Bridge balances + the destination balance follow the currently selected route.
+    await refreshBridgeBalances();
   } catch (err) {
     console.error(err);
     alert("Wallet connection failed: " + (err.message || err));
@@ -171,7 +277,9 @@ async function connectWallet() {
 function disconnectWallet() {
   provider = null; signer = null; userAddress = null;
   latestBalances = { USDC: null, EURC: null, CIRBTC: null };
+  bridgeNetworkBalances = {};
   pendingMint = null;
+  pendingBurn = null;
   try { localStorage.setItem("thorpay_disconnected", "1"); } catch (e) {}
 
   if (connectBtn) connectBtn.innerText = "Connect Wallet";
@@ -376,7 +484,6 @@ async function refreshBalances() {
   setText("usdcBal", formatBal(usdc));
   setText("eurcBal", formatBal(eurc));
   setText("totalBalance", "$" + formatBal(Math.max(0, (usdc || 0) + (eurc || 0))));
-  setText("bridgeFromBal", "Balance: " + formatBal(usdc));
   setText("sendBal", "Balance: " + formatBal(document.getElementById("sendToken")?.value === "EURC" ? eurc : usdc));
 
   const welcome = document.getElementById("welcomeMsg");
@@ -431,39 +538,181 @@ if (swapFromTokenSel) swapFromTokenSel.addEventListener("change", updateSwapFrom
 const swapToTokenSel = document.getElementById("swapToToken");
 if (swapToTokenSel) swapToTokenSel.addEventListener("change", updateSwapToBal);
 
-async function refreshDestinationBalance() {
-  const chainSel = document.getElementById("bridgeToChain");
-  const el = document.getElementById("bridgeToBal");
-  if (!chainSel || !el) return;
-  const dest = CONFIG.bridgeDestinations[chainSel.value];
-  if (!dest) return;
-  if (!userAddress) { el.innerText = "Connect your wallet to see this balance"; return; }
+/* -------------------------------------------------------------------------
+   Bridge balance helpers.
+
+   The Bridge can source from any of the four supported testnets, so its
+   "From" and "To" USDC balances must follow the selected route — they are
+   read over each network's public RPC (read-only) rather than only what
+   MetaMask is currently on, so the numbers always match the chosen chain.
+   ------------------------------------------------------------------------- */
+
+function getBridgeToKey() {
+  const sel = document.getElementById("bridgeToChain");
+  return (sel && sel.value) || "arc";
+}
+
+function getBridgeFromKey() {
+  const sel = document.getElementById("bridgeFromChain");
+  return (sel && sel.value) || bridgeFromKey;
+}
+
+function isBridgeRoute(fromKey, toKey) {
+  if (fromKey === toKey) return false;
+  return CONFIG.bridgeRoutes.some(r => r.from === fromKey && r.to === toKey);
+}
+
+async function currentChainId() {
+  return (await window.ethereum.request({ method: "eth_chainId" })).toLowerCase();
+}
+
+// Is the wallet currently on the given network (by chainIdHex)?
+async function isWalletOnNetwork(network) {
   try {
-    el.innerText = "Checking " + dest.name + " balance…";
-    const bal = await readOnlyBalance(dest.rpcUrls[0], dest.usdc, userAddress);
-    el.innerText = "Balance on " + dest.name + ": " + formatBal(bal) + " USDC";
+    const cid = await currentChainId();
+    return cid === network.chainIdHex.toLowerCase();
   } catch (e) {
-    console.error("destination balance fetch failed", e);
-    el.innerText = "Couldn't load " + dest.name + " balance right now";
+    return false;
   }
 }
-const bridgeToChainSel = document.getElementById("bridgeToChain");
-if (bridgeToChainSel) bridgeToChainSel.addEventListener("change", refreshDestinationBalance);
 
-/* -------------------------------------------------------------------------
-   Bridge TO-amount preview — CCTP V2 here always runs with maxFee=0
-   (standard transfer), so the minted amount on the destination chain is
-   exactly equal to what's burned on Arc. Mirror it live as the person types
-   instead of leaving the disabled TO field stuck at its placeholder.
-   ------------------------------------------------------------------------- */
-const bridgeFromAmtEl = document.getElementById("bridgeFromAmt");
-const bridgeToAmtEl = document.getElementById("bridgeToAmt");
-if (bridgeFromAmtEl && bridgeToAmtEl) {
-  bridgeFromAmtEl.addEventListener("input", () => {
-    const v = bridgeFromAmtEl.value;
-    bridgeToAmtEl.value = (v && Number(v) > 0) ? v : "";
+// Read USDC balance for the connected address off a given NETWORK (via its
+// public read-only RPC) and cache it in bridgeNetworkBalances[networkKey].
+async function fetchBridgeNetworkBalance(networkKey) {
+  const net = networkByKey(networkKey);
+  if (!userAddress) return null;
+  // If the wallet is connected to this exact chain, read through the wallet
+  // (next to nothing can go wrong); otherwise read the public RPC.
+  try {
+    const isWalletNet = await isWalletOnNetwork(net);
+    if (isWalletNet && provider) {
+      const c = new ethers.Contract(net.usdc, ERC20_ABI, provider);
+      const [raw, decimals] = await Promise.all([c.balanceOf(userAddress), c.decimals()]);
+      bridgeNetworkBalances[networkKey] = Number(ethers.utils.formatUnits(raw, decimals));
+    } else {
+      const bal = await readOnlyBalance(net.rpcUrls[0], net.usdc, userAddress);
+      bridgeNetworkBalances[networkKey] = bal;
+    }
+  } catch (e) {
+    console.warn("could not read " + net.name + " USDC balance", e);
+    bridgeNetworkBalances[networkKey] = null;
+  }
+  return bridgeNetworkBalances[networkKey];
+}
+
+async function refreshBridgeBalances() {
+  // From balance = USDC on the selected source network.
+  await fetchBridgeNetworkBalance(bridgeFromKey);
+  renderBridgeBalances();
+}
+
+function renderBridgeBalances() {
+  const fromNet = networkByKey(bridgeFromKey);
+  const fromBal = bridgeNetworkBalances[bridgeFromKey];
+  setText("bridgeFromBal", "Balance: " + formatBal(fromBal) + " USDC");
+  setText("bridgeFromNet", fromNet.name);
+  setText("bridgeFromNetUsdc", fromNet.name + " · USDC");
+  // Refresh the destination balance separately (async, best-effort).
+  updateBridgeToBalance();
+}
+
+async function updateBridgeToBalance() {
+  const toKey = getBridgeToKey();
+  const toNet = networkByKey(toKey);
+  const el = document.getElementById("bridgeToBal");
+  if (!el) return;
+  if (!userAddress) { el.innerText = "Connect your wallet to see this balance"; return; }
+  try {
+    el.innerText = "Checking " + toNet.name + " balance…";
+    const bal = await fetchBridgeNetworkBalance(toKey);
+    el.innerText = "Balance on " + toNet.name + ": " + formatBal(bal) + " USDC";
+  } catch (e) {
+    console.error("bridge destination balance fetch failed", e);
+    el.innerText = "Couldn't load " + toNet.name + " balance right now";
+  }
+}
+
+// Populate each network's selector <select>. Called once on load.
+function populateBridgeSelectors() {
+  const fromSel = document.getElementById("bridgeFromChain");
+  const toSel = document.getElementById("bridgeToChain");
+  if (fromSel) {
+    fromSel.innerHTML = Object.keys(CONFIG.networks)
+      .map(k => `<option value="${k}">${CONFIG.networks[k].name}</option>`)
+      .join("");
+    fromSel.value = bridgeFromKey;
+  }
+  if (toSel) {
+    buildBridgeToOptions();
+  }
+}
+
+// Rebuild the To-options so only valid routes are offered from the current source.
+function buildBridgeToOptions() {
+  const toSel = document.getElementById("bridgeToChain");
+  if (!toSel) return;
+  const fromKey = getBridgeFromKey();
+  const options = CONFIG.bridgeRoutes
+    .filter(r => r.from === fromKey)
+    .map(r => {
+      const net = CONFIG.networks[r.to];
+      return `<option value="${r.to}" data-valid="1">${net.name}</option>`;
+    })
+    .join("");
+  toSel.innerHTML = options;
+  // Select the first valid destination, or keep current if still valid.
+  if (!CONFIG.bridgeRoutes.some(r => r.from === fromKey && r.to === toSel.value)) {
+    toSel.value = toSel.options[0] ? toSel.options[0].value : "";
+  }
+  if (toSel.options.length === 0) {
+    toSel.innerHTML = `<option value="">No valid destination</option>`;
+  }
+}
+
+// Keep From and To selectors consistent so the route is always valid, and
+// re-render the balances/network hints for the new route.
+function syncBridgeSelectors() {
+  buildBridgeToOptions();
+  const fromNet = networkByKey(getBridgeFromKey());
+  const toNet = networkByKey(getBridgeToKey());
+  setText("bridgeFromNet", fromNet.name);
+  setText("bridgeToNet", toNet.name);
+  setText("bridgeFromNetUsdc", fromNet.name + " · USDC");
+  document.getElementById("bridgeRouteLine") && (document.getElementById("bridgeRouteLine").innerText = fromNet.name + " → " + toNet.name);
+  document.getElementById("bridgeToNetUsdc") && (document.getElementById("bridgeToNetUsdc").innerText = toNet.name + " · USDC");
+  updateBridgeToBalance();
+  fetchBridgeNetworkBalance(getBridgeFromKey()).then(renderBridgeBalances);
+}
+
+// Reverse button — swap From and To (both directions are always supported).
+function reverseBridgeRoute() {
+  const fromSel = document.getElementById("bridgeFromChain");
+  const toSel = document.getElementById("bridgeToChain");
+  if (!fromSel || !toSel) return;
+  const newFrom = toSel.value;
+  if (!newFrom) return;
+  bridgeFromKey = newFrom;
+  fromSel.value = newFrom;
+  syncBridgeSelectors();
+}
+
+const bridgeFromChainSel = document.getElementById("bridgeFromChain");
+if (bridgeFromChainSel) {
+  bridgeFromChainSel.addEventListener("change", () => {
+    bridgeFromKey = getBridgeFromKey();
+    syncBridgeSelectors();
+    bridgeFromChainSel.blur();
   });
 }
+const bridgeFlipBtn = document.getElementById("bridgeFlip");
+if (bridgeFlipBtn) bridgeFlipBtn.addEventListener("click", reverseBridgeRoute);
+
+populateBridgeSelectors();
+syncBridgeSelectors();
+
+/* -------------------------------------------------------------------------
+   Bridge balances follow the selected route (see helpers below).
+   ------------------------------------------------------------------------- */
 
 function setText(id, txt) {
   const el = document.getElementById(id);
@@ -521,190 +770,134 @@ if (swapFlip) {
    ------------------------------------------------------------------------- */
 
 /* -------------------------------------------------------------------------
-   Bridge (CCTP V2) — real burn on Arc Testnet, real attestation check, and
-   a one-click mint on the destination chain (testnet TokenMessengerV2 /
-   MessageTransmitterV2 share the same address across chains, verified
-   against Circle's CCTP Go SDK docs, so this is safe to automate).
+   Bridge (CCTP V2) — REAL cross-chain USDC bridging between Arc Testnet and
+   Arbitrum Sepolia / Base Sepolia / Ethereum Sepolia, in BOTH directions.
+
+   Protocol: Circle's official CCTP V2 contracts (burn-and-mint). The testnet
+   TokenMessengerV2 / MessageTransmitterV2 are CREATE2-deployed at the SAME
+   address on every supported testnet (verified from Circle's official CCTP
+   contract-addresses + Arc's own docs), so one shared address works as both
+   source and destination across all four chains.
+
+   Flow (identical for every route, both directions):
+     1. Validate wallet + switch to the SOURCE chain.
+     2. Approve TokenMessengerV2 to spend USDC on the source chain.
+     3. depositForBurn(...) on the source chain -> burns USDC, emits the
+        CCTP message (Circle attests to it via Iris).
+     4. Wait for the burn tx to confirm.
+     5. Poll Circle Iris for the attestation (message + signature).
+     6. Switch to the DESTINATION chain and receiveMessage(...) -> mints USDC.
+     7. Done — show the destination tx + explorer links.
+
+   Honest states: nothing is marked "completed" until receiveMessage() has a
+   confirmed receipt on the destination chain.
+
+   ETH: CCTP moves USDC ONLY — it does not bridge native ETH. ARC's native gas
+   token IS USDC, and there is no official CCTP native-ETH bridge for these
+   testnet routes, so native ETH bridging is intentionally NOT offered.
    ------------------------------------------------------------------------- */
-const bridgeBtn = document.getElementById("bridgeBtn");
-if (bridgeBtn) {
-  bridgeBtn.addEventListener("click", async () => {
-    const statusEl = document.getElementById("bridgeStatus");
-    const progressEl = document.getElementById("bridgeProgress");
-    if (!signer) {
-      try {
-        statusEl.className = "status"; statusEl.innerText = "Connecting wallet\u2026";
-        await connectWallet();
-      } catch (err) {
-        statusEl.className = "status err"; statusEl.innerText = "Wallet connection failed: " + (err.message || err);
-        return;
-      }
-      if (!signer) { statusEl.className = "status err"; statusEl.innerText = "Connect your wallet first."; return; }
-    }
 
-    const amt = document.getElementById("bridgeFromAmt").value;
-    if (!amt || Number(amt) <= 0) { statusEl.className = "status err"; statusEl.innerText = "Enter an amount."; return; }
+// ETH is NOT bridged via CCTP — keep the token selector USDC-only and label
+// it honestly in the UI (see bridgeTokenUsdcNote). No ETH option is offered.
+const bridgeFromTokenSel = document.getElementById("bridgeFromToken");
+if (bridgeFromTokenSel) bridgeFromTokenSel.value = "USDC";
 
-    if (latestBalances.USDC !== null && Number(amt) > latestBalances.USDC) {
-      statusEl.className = "status err";
-      statusEl.innerText = "Insufficient balance. You have " + formatBal(latestBalances.USDC) + " USDC available.";
-      return;
-    }
-
-    const destKey = document.getElementById("bridgeToChain").value;
-    const dest = CONFIG.bridgeDestinations[destKey];
-
-    try {
-      bridgeBtn.disabled = true;
-      progressEl.style.display = "block";
-      document.getElementById("bridgeMintBtn").style.display = "none";
-      document.getElementById("bridgeRetryBtn").style.display = "none";
-      pendingMint = null;
-      pendingBurn = null;
-
-      const usdc = new ethers.Contract(CONFIG.USDC_ERC20, ERC20_ABI, signer);
-      const decimals = await usdc.decimals();
-      const amountUnits = ethers.utils.parseUnits(amt, decimals);
-
-      statusEl.className = "status"; statusEl.innerText = "Step 1/3 — approving USDC...";
-      progressEl.innerText = "Approving TokenMessengerV2 to spend USDC...";
-      const approveTx = await usdc.approve(CONFIG.TOKEN_MESSENGER_V2, amountUnits);
-      await approveTx.wait();
-
-      statusEl.innerText = "Step 2/3 — burning USDC on Arc Testnet...";
-      progressEl.innerText = "Approved. Submitting depositForBurn...";
-      const messenger = new ethers.Contract(CONFIG.TOKEN_MESSENGER_V2, TOKEN_MESSENGER_V2_ABI, signer);
-      const mintRecipient = ethers.utils.hexZeroPad(userAddress, 32); // sending to yourself on destination by default
-      const destinationCaller = ethers.utils.hexZeroPad("0x0000000000000000000000000000000000000000", 32); // anyone can mint
-      const maxFee = 0; // standard transfer, no fast-transfer fee
-      const minFinalityThreshold = 2000; // standard finality
-
-      const burnTx = await messenger.depositForBurn(
-        amountUnits, dest.domain, mintRecipient, CONFIG.USDC_ERC20,
-        destinationCaller, maxFee, minFinalityThreshold
-      );
-      const burnReceipt = await burnTx.wait();
-
-      statusEl.innerText = "Step 3/3 — waiting for Circle's attestation...";
-      progressEl.innerText = "Burned. Tx: " + burnReceipt.transactionHash + "\nPolling Iris API for attestation...";
-
-      const attestation = await pollAttestation(burnReceipt.transactionHash);
-
-      if (attestation && attestation.message && attestation.attestation) {
-        pendingMint = { message: attestation.message, attestation: attestation.attestation, dest };
-        statusEl.className = "status ok";
-        statusEl.innerText = "Burn confirmed and attested! Click below to finish minting on " + dest.name + ".";
-        progressEl.innerText =
-          "Burn tx: " + burnReceipt.transactionHash + "\n" +
-          "Attestation ready. Your USDC hasn't arrived on " + dest.name + " yet — click " +
-          "\"Complete mint on destination chain\" below to finish (this will briefly switch MetaMask to " + dest.name + ").";
-        document.getElementById("bridgeMintBtn").style.display = "block";
-        pendingBurn = null;
-        document.getElementById("bridgeRetryBtn").style.display = "none";
-      } else {
-        pendingBurn = { txHash: burnReceipt.transactionHash, dest };
-        statusEl.className = "status err";
-        statusEl.innerText = "Burned on Arc — attestation isn't ready yet. Your USDC hasn't left Arc, nothing is lost. Click \"Check attestation again\" below in a minute.";
-        progressEl.innerText =
-          "Burn tx: " + burnReceipt.transactionHash + "\n" +
-          "Circle's attestation can take a few minutes on testnet — use the button below to check again, " +
-          "no need to redo the burn.";
-        document.getElementById("bridgeRetryBtn").style.display = "block";
-      }
-
-      addHistory("BRIDGE", amt + " USDC → " + dest.name, burnReceipt.transactionHash);
-      await refreshBalances();
-    } catch (err) {
-      console.error(err);
-      statusEl.className = "status err";
-      statusEl.innerText = "Error: " + (err.message || err);
-    } finally {
-      bridgeBtn.disabled = false;
-    }
+// TO-amount preview: CCTP "Standard Transfer" runs with maxFee=0, so the
+// minted amount equals the burned amount (before any min-fee). Mirror it
+// live as the person types so the disabled TO field never looks stale.
+const bridgeFromAmtEl = document.getElementById("bridgeFromAmt");
+const bridgeToAmtEl = document.getElementById("bridgeToAmt");
+if (bridgeFromAmtEl && bridgeToAmtEl) {
+  bridgeFromAmtEl.addEventListener("input", () => {
+    const v = bridgeFromAmtEl.value;
+    bridgeToAmtEl.value = (v && Number(v) > 0) ? v : "";
   });
 }
 
-const bridgeRetryBtn = document.getElementById("bridgeRetryBtn");
-if (bridgeRetryBtn) {
-  bridgeRetryBtn.addEventListener("click", async () => {
-    if (!pendingBurn) return;
-    const statusEl = document.getElementById("bridgeStatus");
-    const progressEl = document.getElementById("bridgeProgress");
-    bridgeRetryBtn.disabled = true;
-    statusEl.className = "status"; statusEl.innerText = "Checking attestation again...";
-    try {
-      const attestation = await pollAttestation(pendingBurn.txHash, 3, 4000);
-      if (attestation && attestation.message && attestation.attestation) {
-        pendingMint = { message: attestation.message, attestation: attestation.attestation, dest: pendingBurn.dest };
-        statusEl.className = "status ok";
-        statusEl.innerText = "Attestation ready! Click below to finish minting on " + pendingBurn.dest.name + ".";
-        document.getElementById("bridgeMintBtn").style.display = "block";
-        bridgeRetryBtn.style.display = "none";
-        pendingBurn = null;
-      } else {
-        statusEl.className = "status err";
-        statusEl.innerText = "Still not ready — Circle's testnet attestation can take a few minutes. Try again shortly.";
-      }
-    } catch (err) {
-      console.error(err);
-      statusEl.className = "status err";
-      statusEl.innerText = "Check failed: " + (err.message || err);
-    } finally {
-      bridgeRetryBtn.disabled = false;
-    }
-  });
+// Max button — fill From-amount with the full USDC balance on the source chain.
+function bridgeMax() {
+  if (!userAddress) return;
+  const bal = bridgeNetworkBalances[getBridgeFromKey()];
+  if (bal === null || bal === undefined) return;
+  const amtEl = document.getElementById("bridgeFromAmt");
+  if (!amtEl) return;
+  amtEl.value = bal > 0 ? bal.toFixed(6) : "0";
+  amtEl.dispatchEvent(new Event("input"));
+}
+const bridgeMaxBtn = document.getElementById("bridgeMax");
+if (bridgeMaxBtn) bridgeMaxBtn.addEventListener("click", bridgeMax);
+
+/* -- Wallet/network validation + switching for the bridge ----------------- */
+
+function userRejected(error) {
+  const code = error && (error.code || (error.error && error.error.code));
+  return code === 4001 || code === -32002 && false || (typeof error === "string" && /user rejected|user denied/i.test(error))
+    || (error && /user rejected|user denied/i.test(String(error.message || "")));
 }
 
-const bridgeMintBtn = document.getElementById("bridgeMintBtn");
-if (bridgeMintBtn) {
-  bridgeMintBtn.addEventListener("click", async () => {
-    if (!pendingMint) return;
-    const statusEl = document.getElementById("bridgeStatus");
-    const progressEl = document.getElementById("bridgeProgress");
-    bridgeMintBtn.disabled = true;
-
-    try {
-      statusEl.className = "status"; statusEl.innerText = "Switching MetaMask to " + pendingMint.dest.name + "...";
-      await switchOrAddChain(pendingMint.dest);
-
-      const destProvider = new ethers.providers.Web3Provider(window.ethereum, "any");
-      const destSigner = destProvider.getSigner();
-      const transmitter = new ethers.Contract(CONFIG.MESSAGE_TRANSMITTER_V2, MESSAGE_TRANSMITTER_V2_ABI, destSigner);
-
-      statusEl.innerText = "Minting on " + pendingMint.dest.name + "...";
-      const tx = await transmitter.receiveMessage(pendingMint.message, pendingMint.attestation);
-      const receipt = await tx.wait();
-
-      statusEl.className = "status ok";
-      statusEl.innerText = "Minted on " + pendingMint.dest.name + "! Tx: " + receipt.transactionHash;
-      progressEl.innerText = "Mint confirmed: " + receipt.transactionHash;
-      addHistory("BRIDGE-MINT", "Minted on " + pendingMint.dest.name, receipt.transactionHash);
-
-      await refreshDestinationBalance();
-
-      // Switch back to Arc so the rest of the app keeps working normally.
-      await ensureArcNetwork();
-      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
-      signer = provider.getSigner();
-      await checkNetwork();
-      await refreshBalances();
-
-      pendingMint = null;
-      bridgeMintBtn.style.display = "none";
-    } catch (err) {
-      console.error(err);
-      statusEl.className = "status err";
-      statusEl.innerText = "Mint failed: " + (err.message || err);
-    } finally {
-      bridgeMintBtn.disabled = false;
-    }
-  });
+function setBridgeStatus(cls, text) {
+  const el = document.getElementById("bridgeStatus");
+  if (!el) return;
+  el.className = "status" + (cls ? " " + cls : "");
+  el.innerText = text;
+}
+function setBridgeProgress(text) {
+  const el = document.getElementById("bridgeProgress");
+  if (!el) return;
+  el.style.display = text ? "block" : "none";
+  if (text) el.innerText = text;
 }
 
-async function pollAttestation(txHash, attempts = 15, delayMs = 8000) {
+// Ensure the wallet is connected and on the given SOURCE network. Returns true
+// if ready to proceed. If it's on the wrong chain, offers a switch and waits.
+async function ensureBridgeSourceNetwork(network) {
+  if (!signer) {
+    setBridgeStatus("", "Connecting wallet…");
+    await connectWallet();
+    if (!signer) { setBridgeStatus("err", "Connect your wallet first."); return false; }
+  }
+  const onNet = await isWalletOnNetwork(network);
+  if (onNet) return true;
+
+  setBridgeStatus("err", "Wrong network — switch your wallet to " + network.name + " to bridge from it.");
+  try {
+    await switchOrAddChain(network);
+    // Reconnect the signer to the newly selected chain before proceeding.
+    provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+    signer = provider.getSigner();
+    await checkNetwork();
+    return true;
+  } catch (switchErr) {
+    if (userRejected(switchErr)) {
+      setBridgeStatus("err", "Network switch rejected. Bridge cancelled — switch to " + network.name + " and try again.");
+    } else {
+      setBridgeStatus("err", "Couldn't switch to " + network.name + ": " + (switchErr.message || String(switchErr)));
+    }
+    return false;
+  }
+}
+
+// Try to estimate the native gas needed for two txns (approve+burn on the
+// source chain) and warn the user early if it looks short. Read-only best effort.
+async function checkBridgeNativeGas(network) {
+  try {
+    const amtUnits = 130000 + 250000; // ~approve + depositForBurn
+    const price = await provider.getGasPrice();
+    const needed = price.mul(amtUnits);
+    const raw = await provider.getBalance(userAddress);
+    if (raw.lt(needed)) {
+      const sym = network.nativeCurrency.symbol;
+      return "Low " + sym + " balance for gas — you may need " + sym + " to pay the bridge fees. " +
+        (network.nativeGasIsUsdc ? "On Arc, gas IS USDC (already held as USDC)." : "Fund it from a faucet.");
+    }
+  } catch (e) { /* best-effort gas estimate; don't block the bridge */ }
+  return "";
+}
+
+async function pollAttestation(sourceDomain, txHash, attempts = 16, delayMs = 8000) {
   for (let i = 0; i < attempts; i++) {
     try {
-      const url = `${CONFIG.IRIS_API}/v2/messages/${CONFIG.CCTP_DOMAIN_ARC}?transactionHash=${txHash}`;
+      const url = `${CONFIG.IRIS_API}/v2/messages/${sourceDomain}?transactionHash=${txHash}`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -721,6 +914,207 @@ async function pollAttestation(txHash, attempts = 15, delayMs = 8000) {
   return null;
 }
 
+/* -- Bridge execution ----------------------------------------------------- */
+
+const bridgeBtn = document.getElementById("bridgeBtn");
+if (bridgeBtn) {
+  bridgeBtn.addEventListener("click", async () => {
+    const fromSel = document.getElementById("bridgeFromChain");
+    const toSel = document.getElementById("bridgeToChain");
+    const fromKey = getBridgeFromKey();
+    const toKey = getBridgeToKey();
+    const fromNetwork = networkByKey(fromKey);
+    const toNetwork = networkByKey(toKey);
+
+    try {
+      setBridgeProgress("");
+      document.getElementById("bridgeMintBtn").style.display = "none";
+      document.getElementById("bridgeRetryBtn").style.display = "none";
+      pendingMint = null;
+      pendingBurn = null;
+
+      if (!isBridgeRoute(fromKey, toKey)) {
+        setBridgeStatus("err", "Unsupported route — pick a valid source/destination pair.");
+        return;
+      }
+
+      const amt = document.getElementById("bridgeFromAmt").value;
+      if (!amt || Number(amt) <= 0) { setBridgeStatus("err", "Enter an amount."); return; }
+
+      // Ensure wallet is connected + on the source chain before anything else.
+      if (!(await ensureBridgeSourceNetwork(fromNetwork))) return;
+
+      // Balance check against the SOURCE chain's USDC.
+      const fromBalance = await fetchBridgeNetworkBalance(fromKey);
+      if (fromBalance !== null && Number(amt) > fromBalance) {
+        setBridgeStatus("err", "Insufficient USDC — you have " + formatBal(fromBalance) + " USDC on " + fromNetwork.name + ".");
+        return;
+      }
+
+      const gasNote = await checkBridgeNativeGas(fromNetwork);
+      if (gasNote) setBridgeProgress(gasNote);
+
+      bridgeBtn.disabled = true;
+      const usdcAddr = fromNetwork.usdc;
+      const messengerAddr = fromNetwork.tokenMessenger;
+      const destinationDomain = toNetwork.domain;
+
+      const usdc = new ethers.Contract(usdcAddr, ERC20_ABI, signer);
+      const decimals = await usdc.decimals();
+      const amountUnits = ethers.utils.parseUnits(amt, decimals);
+
+      // 1) Approval (do it every time — CCTP collapses the amount, and it's
+      //    cheap on testnet; handling rejects cleanly is the point).
+      setBridgeStatus("", "Step 1/4 — approving USDC on " + fromNetwork.name + "…");
+      setBridgeProgress("Approving TokenMessengerV2 to spend USDC…");
+      const approveTx = await usdc.approve(messengerAddr, amountUnits);
+      setBridgeStatus("ok", "Approval request sent — waiting for confirmation…");
+      await approveTx.wait();
+      setBridgeProgress("Approval confirmed.");
+
+      // 2) Burn on the source chain.
+      setBridgeStatus("", "Step 2/4 — burning USDC on " + fromNetwork.name + "…");
+      setBridgeProgress("Submitting depositForBurn…");
+      const messenger = new ethers.Contract(messengerAddr, TOKEN_MESSENGER_V2_ABI, signer);
+      const mintRecipient = ethers.utils.hexZeroPad(userAddress, 32);
+      const destinationCaller = ethers.utils.hexZeroPad("0x0000000000000000000000000000000000000000", 32);
+      const maxFee = 0; // Standard Transfer (no upfront fee)
+      const minFinalityThreshold = fromNetwork.minFinalityThreshold || 1000;
+
+      const burnTx = await messenger.depositForBurn(
+        amountUnits, destinationDomain, mintRecipient, usdcAddr,
+        destinationCaller, maxFee, minFinalityThreshold
+      );
+      setBridgeStatus("", "Step 3/4 — waiting for burn confirmation on " + fromNetwork.name + "…");
+      const burnReceipt = await burnTx.wait();
+      const burnTxHash = burnReceipt.transactionHash;
+      setBridgeProgress("Burned. Tx: " + burnTxHash + "\nWaiting for Circle's attestation (Iris)…");
+
+      // 3) Attestation — poll Iris using the SOURCE chain's domain.
+      setBridgeStatus("", "Step 4/4 — waiting for Circle's attestation (can take a minute or two)…");
+      const attestation = await pollAttestation(fromNetwork.domain, burnTxHash);
+
+      addHistory("BRIDGE", amt + " USDC → " + toNetwork.name, burnTxHash);
+
+      if (attestation && attestation.message && attestation.attestation) {
+        pendingMint = {
+          message: attestation.message,
+          attestation: attestation.attestation,
+          fromNetwork,
+          toNetwork,
+          amount: amt
+        };
+        setBridgeStatus("ok", "Burn confirmed + attested! Click “Complete mint on destination chain” below to finish.");
+        setBridgeProgress(
+          "Burn tx: " + burnTxHash + "\nAttestation ready. Your USDC isn't on " + toNetwork.name +
+          " yet — click below to mint (MetaMask will switch to " + toNetwork.name + ")."
+        );
+        document.getElementById("bridgeMintBtn").style.display = "block";
+        document.getElementById("bridgeRetryBtn").style.display = "none";
+        pendingBurn = null;
+      } else {
+        pendingBurn = { txHash: burnTxHash, fromNetwork, toNetwork, amount: amt };
+        setBridgeStatus("err", "Burned on " + fromNetwork.name + " — attestation isn't ready yet. Nothing is lost. Click “Check attestation again” in a minute.");
+        setBridgeProgress(
+          "Burn tx: " + burnTxHash + "\nCircle's testnet attestation can take a few minutes — use the button to check again, no need to re-burn."
+        );
+        document.getElementById("bridgeRetryBtn").style.display = "block";
+      }
+
+      await fetchBridgeNetworkBalance(fromKey);
+      renderBridgeBalances();
+    } catch (err) {
+      console.error(err);
+      if (userRejected(err)) {
+        setBridgeStatus("err", "Transaction rejected in wallet. No USDC moved — you can try again.");
+      } else {
+        setBridgeStatus("err", "Bridge failed: " + (err.message || String(err)));
+      }
+    } finally {
+      bridgeBtn.disabled = false;
+    }
+  });
+}
+
+const bridgeRetryBtn = document.getElementById("bridgeRetryBtn");
+if (bridgeRetryBtn) {
+  bridgeRetryBtn.addEventListener("click", async () => {
+    if (!pendingBurn) return;
+    bridgeRetryBtn.disabled = true;
+    setBridgeStatus("", "Checking attestation again…");
+    try {
+      const attestation = await pollAttestation(pendingBurn.fromNetwork ? pendingBurn.fromNetwork.domain : CONFIG.networks.arc.domain, pendingBurn.txHash, 3, 5000);
+      if (attestation && attestation.message && attestation.attestation) {
+        pendingMint = {
+          message: attestation.message,
+          attestation: attestation.attestation,
+          fromNetwork: pendingBurn.fromNetwork,
+          toNetwork: pendingBurn.toNetwork,
+          amount: pendingBurn.amount
+        };
+        setBridgeStatus("ok", "Attestation ready! Click below to finish minting on " + pendingBurn.toNetwork.name + ".");
+        document.getElementById("bridgeMintBtn").style.display = "block";
+        bridgeRetryBtn.style.display = "none";
+        pendingBurn = null;
+      } else {
+        setBridgeStatus("err", "Still not ready — Circle's testnet attestation can take a few minutes. Try again shortly.");
+      }
+    } catch (err) {
+      console.error(err);
+      setBridgeStatus("err", "Check failed: " + (err.message || String(err)));
+    } finally {
+      bridgeRetryBtn.disabled = false;
+    }
+  });
+}
+
+const bridgeMintBtn = document.getElementById("bridgeMintBtn");
+if (bridgeMintBtn) {
+  bridgeMintBtn.addEventListener("click", async () => {
+    if (!pendingMint) return;
+    const dest = pendingMint.toNetwork;
+    bridgeMintBtn.disabled = true;
+    try {
+      setBridgeStatus("", "Switching wallet to " + dest.name + "…");
+      await switchOrAddChain(dest);
+      const destProvider = new ethers.providers.Web3Provider(window.ethereum, "any");
+      const destSigner = destProvider.getSigner();
+      const transmitter = new ethers.Contract(dest.messageTransmitter, MESSAGE_TRANSMITTER_V2_ABI, destSigner);
+
+      setBridgeStatus("", "Minting " + pendingMint.amount + " USDC on " + dest.name + "…");
+      const tx = await transmitter.receiveMessage(pendingMint.message, pendingMint.attestation);
+      const receipt = await tx.wait();
+
+      setBridgeStatus("ok", "Minted on " + dest.name + "! Tx: " + receipt.transactionHash);
+      setBridgeProgress("Mint confirmed: " + receipt.transactionHash);
+      addHistory("BRIDGE-MINT", "Minted " + pendingMint.amount + " USDC on " + dest.name, receipt.transactionHash);
+
+      // Refresh the destination balance now that USDC arrived there.
+      updateBridgeToBalance();
+
+      // Switch back to Arc so the rest of the app (swap/send/balances) keeps
+      // working in its default network.
+      await ensureArcNetwork();
+      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+      signer = provider.getSigner();
+      await checkNetwork();
+      await refreshBalances();
+
+      pendingMint = null;
+      bridgeMintBtn.style.display = "none";
+      document.getElementById("bridgeRetryBtn").style.display = "none";
+    } catch (err) {
+      console.error(err);
+      if (userRejected(err)) {
+        setBridgeStatus("err", "Mint rejected in wallet. Your USDC was burned and attested — you can retry the mint from the History note or by starting a new bridge with the same burn tx hash.");
+      } else {
+        setBridgeStatus("err", "Mint failed: " + (err.message || String(err)));
+      }
+    } finally {
+      bridgeMintBtn.disabled = false;
+    }
+  });
+}
 /* -------------------------------------------------------------------------
    Send — real ERC-20 transfer (USDC or EURC) through the ERC-20 interface.
    ------------------------------------------------------------------------- */
@@ -841,7 +1235,7 @@ if (window.ethereum) {
     loadHistory();
     await checkNetwork();
     await refreshBalances();
-    await refreshDestinationBalance();
+    await refreshBridgeBalances();
   });
 
   window.ethereum.on("chainChanged", async () => {
@@ -850,6 +1244,7 @@ if (window.ethereum) {
     signer = provider.getSigner();
     const correct = await checkNetwork();
     if (correct) await refreshBalances();
+    await refreshBridgeBalances();
   });
 }
 
