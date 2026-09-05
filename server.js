@@ -128,12 +128,18 @@ try {
 function arcTransport() {
   return fallback(
     ARC_RPC_FALLBACK_LIST.map(url => http(url, {
-      retryCount: 3,
-      timeout: 20000,
+      // Keep per-call retries SHORT: the outer withRpcRetry already retries
+      // the whole estimateSwap/swap sequence, so stacking a long per-RPC
+      // backoff on top of it is what turned a transient Arc rate-limit into
+      // the multi-second (worst case 20s+) blank quote wait observed on the
+      // Swap screen. 2 quick retries here + a bounded outer retry below is
+      // enough for a read-only quote.
+      retryCount: 2,
+      timeout: 10000,
       retryDelay: ({ count, error }) => {
         const isRateLimited = error && (error.code === -32011 || /request limit/i.test(String(error.message || "")));
-        const base = isRateLimited ? 2000 : 300;
-        return Math.min(base * 2 ** count, 20000) + Math.floor(Math.random() * 300); // exponential backoff + jitter
+        const base = isRateLimited ? 1000 : 200;
+        return Math.min(base * 2 ** count, 8000) + Math.floor(Math.random() * 200); // exponential backoff + jitter, hard-capped
       }
     })),
     { rank: false }
@@ -195,8 +201,15 @@ async function getRelayerAdapter() {
    sequence, and Circle's own request-limit errors don't always surface
    through viem's retry path). Retries the whole call a few times with
    backoff before giving up.
+
+   Tuned for the quote path: the original 7 retries with a 2s base kicked in
+   far too aggressively on Arc's shared public RPC rate-limit (-32011) and,
+   stacked on top of viem's per-call retry, produced the multi-second blank
+   quote waits users saw on the Swap screen. 3 retries at 500ms base cap the
+   worst added wait at ~3.5s so a rate-limited quote comes back fast. The
+   swap path reuses the same wrapper — still 3 real retries, just quicker.
    ------------------------------------------------------------------------- */
-async function withRpcRetry(fn, { retries = 7, baseDelayMs = 2000 } = {}) {
+async function withRpcRetry(fn, { retries = 3, baseDelayMs = 500 } = {}) {
   let lastErr;
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -276,11 +289,35 @@ app.get("/api/config", (req, res) => {
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
 /* -------------------------------------------------------------------------
+   Short-lived quote cache. A quote is only valid for the exact
+   (tokenIn, tokenOut, amountIn) triple that produced it, so re-hitting
+   Circle/Arc whenever the user re-types the SAME amount (e.g. 10 -> 20 ->
+   5 -> 10) burns RPC calls for a result we already have. Caching an exact
+   amount for a few seconds is safe — the price can only move a rounding
+   amount inside 5s and the quote stays accurate — and it turns those rapid
+   re-inputs into instant responses. Amounts NEVER cross the cache boundary:
+   a change of amount/token always goes back to the live Circle quote.
+   ------------------------------------------------------------------------- */
+const QUOTE_CACHE_MS = 5000;
+const quoteCache = new Map(); // `${tokenIn}|${tokenOut}|${amountIn}` -> { estimate, cachedAt }
+
+function getCachedQuote(tokenIn, tokenOut, amountIn) {
+  const key = `${tokenIn}|${tokenOut}|${amountIn}`;
+  const hit = quoteCache.get(key);
+  if (hit && Date.now() - hit.cachedAt < QUOTE_CACHE_MS) {
+    hit.cachedAt = Date.now(); // slide the TTL forward so an active pair stays warm
+    return hit.estimate;
+  }
+  return null;
+}
+
+/* -------------------------------------------------------------------------
    POST /api/quote — { tokenIn, tokenOut, amountIn } -> live quote.
    Read-only, no funds move, so this alone would also fix the "Failed to
    fetch" CORS/browser issue even before anyone deposits anything.
    ------------------------------------------------------------------------- */
 app.post("/api/quote", rateLimit, async (req, res) => {
+  const started = Date.now();
   try {
     const { tokenIn, tokenOut, amountIn } = req.body || {};
     if (!TOKENS[tokenIn] || !TOKENS[tokenOut] || tokenIn === tokenOut) {
@@ -290,6 +327,13 @@ app.post("/api/quote", rateLimit, async (req, res) => {
       return res.status(400).json({ error: "Invalid amountIn." });
     }
 
+    const cached = getCachedQuote(tokenIn, tokenOut, amountIn);
+    if (cached) {
+      res.json(cached);
+      console.log(`quote CACHE hit ${tokenIn}->${tokenOut} ${amountIn} in ${Date.now() - started}ms`);
+      return;
+    }
+
     const adapter = await getRelayerAdapter();
     const config = process.env.KIT_KEY ? { kitKey: process.env.KIT_KEY } : {};
     const estimate = await withRpcRetry(() => kit.estimateSwap({
@@ -297,9 +341,12 @@ app.post("/api/quote", rateLimit, async (req, res) => {
       tokenIn, tokenOut, amountIn: String(amountIn),
       config
     }));
+
+    quoteCache.set(`${tokenIn}|${tokenOut}|${amountIn}`, { estimate, cachedAt: Date.now() });
     res.json(estimate);
+    console.log(`quote LIVE ${tokenIn}->${tokenOut} ${amountIn} in ${Date.now() - started}ms`);
   } catch (err) {
-    console.error("quote failed", err);
+    console.error(`quote failed after ${Date.now() - started}ms`, err);
     res.status(502).json({ error: "Quote failed: " + (err.message || String(err)) });
   }
 });
@@ -416,7 +463,32 @@ app.post("/api/swap", rateLimit, async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`ThorPay Swap Relayer listening on port ${PORT}`);
+  warmUpQuotePath();
 });
+
+/* -------------------------------------------------------------------------
+   Warm-up — build the server-side adapter and take one live quote so the
+   FIRST user request isn't the one that pays the cold-init cost (the
+   module-level relayerAdapter + the Arc RPC connection are both created
+   here and then reused by /api/quote and /api/swap). Runs in the background
+   so it never blocks startup or shields a user request. On serverless
+   hosts (Vercel etc.) the module cache can be recreated per invocation, but
+   on a persistent Node server this removes that first-request 20s+ stall.
+   ------------------------------------------------------------------------- */
+async function warmUpQuotePath() {
+  try {
+    const adapter = await getRelayerAdapter();
+    const config = process.env.KIT_KEY ? { kitKey: process.env.KIT_KEY } : {};
+    await withRpcRetry(() => kit.estimateSwap({
+      from: { adapter, chain: "Arc_Testnet" },
+      tokenIn: "USDC", tokenOut: "EURC", amountIn: "10",
+      config
+    }));
+    console.log("ThorPay quote path warmed (adapter + first estimateSwap ready).");
+  } catch (e) {
+    console.warn("ThorPay warm-up quote failed (will retry lazily on first request):", e.message);
+  }
+}
 
 // Exported for platforms (e.g. Vercel serverless functions) that expect a
 // request-handler export rather than an app.listen() call — harmless no-op

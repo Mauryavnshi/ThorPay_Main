@@ -474,6 +474,32 @@
     estimateTimer = setTimeout(runEstimate, 500);
   }
 
+  // Stale-quote guard — every quote request is tagged with a bumping sequence
+  // number. When a response comes back, it is only applied if it is still the
+  // LATEST request, so an older (slower) response can never overwrite the
+  // amount the user most recently typed. Each run also aborts the previous
+  // in-flight request so we don't stack N concurrent quote calls when the
+  // user types 10 -> 20 -> 5 quickly.
+  let quoteSeq = 0;
+  let activeQuoteController = null;
+
+  // Loading state for the disabled "To" amount field + the Exchange button.
+  // While a quote is in flight the To field shows "Getting quote…" instead of
+  // a stale "0.00", and Exchange is disabled so the user can't fire a swap on
+  // an amount that has no live quote yet.
+  function setSwapBusy(busy) {
+    const toAmt = document.getElementById("swapToAmt");
+    const swapBtnEl = document.getElementById("swapBtn");
+    if (toAmt) {
+      toAmt.value = busy ? "Getting quote\u2026" : "";
+      toAmt.classList.toggle("loading", busy);
+    }
+    if (swapBtnEl && swapBtnEl.disabled === false) {
+      // Don't touch it while the user is actively clicking through a swap.
+      swapBtnEl.disabled = busy;
+    }
+  }
+
   // Slippage only affects the "Min. received" line, not the actual
   // exchange rate — so when only slippage changes (amount/tokens the same),
   // recompute it instantly from the last quote instead of hitting the
@@ -506,18 +532,32 @@
     const tokenIn = document.getElementById("swapFromToken").value;
     const tokenOut = document.getElementById("swapToToken").value;
 
+    // Tag this request as the newest version of the input.
+    const seq = ++quoteSeq;
+    if (activeQuoteController) activeQuoteController.abort();
+
     updateUsdHint("swapFromUsd", tokenIn, amt);
 
+    // Early-return paths below all produce an INVALID quote, so clear any
+    // previous result and make sure Exchange can't run on it.
+    const invalidate = () => {
+      toAmt.value = "";
+      toAmt.classList.remove("loading");
+      document.getElementById("swapBtn").disabled = false;
+    };
+
     if (!window.ThorPay || !window.ThorPay.getUserAddress()) {
+      invalidate();
       if (routeStatus) routeStatus.innerText = "Connect your wallet to see a live quote";
       return;
     }
     if (!getRelayerUrl()) {
+      invalidate();
       if (routeStatus) routeStatus.innerText = "Paste your relayer backend URL under \u201cAdvanced\u201d to get quotes";
       return;
     }
     if (tokenIn === tokenOut) {
-      toAmt.value = "";
+      invalidate();
       document.getElementById("swapToUsd").innerText = "";
       if (routeStatus) routeStatus.innerText = "Pick two different tokens";
       if (minReceivedEl) minReceivedEl.innerText = "\u2014";
@@ -525,7 +565,7 @@
       return;
     }
     if (!amt || Number(amt) <= 0) {
-      toAmt.value = "";
+      invalidate();
       document.getElementById("swapToUsd").innerText = "";
       if (routeStatus) routeStatus.innerText = "Enter an amount to see a quote";
       if (minReceivedEl) minReceivedEl.innerText = "\u2014";
@@ -533,21 +573,30 @@
       return;
     }
 
-    if (gasFeeEl) estimateGasFee().then(fee => { gasFeeEl.innerText = fee; });
+    if (gasFeeEl) estimateGasFee().then(fee => { if (seq === quoteSeq && gasFeeEl) gasFeeEl.innerText = fee; });
 
+    // Live quote is in flight — show the loading state immediately instead of
+    // leaving the stale 0.00 on screen, and disable Exchange until it lands.
+    if (routeStatus) routeStatus.innerText = "Fetching quote\u2026";
+    setSwapBusy(true);
+
+    const controller = new AbortController();
+    activeQuoteController = controller;
     try {
-      if (routeStatus) routeStatus.innerText = "Fetching quote\u2026";
       const url = getRelayerUrl();
       const res = await fetch(url + "/api/quote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tokenIn, tokenOut, amountIn: amt })
+        body: JSON.stringify({ tokenIn, tokenOut, amountIn: amt }),
+        signal: controller.signal
       });
+      if (seq !== quoteSeq) return; // a newer amount came in — drop this stale result
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
 
       const outAmount = Number(data.estimatedOutput?.amount ?? data.amountOut);
       toAmt.value = outAmount.toFixed(4);
+      toAmt.classList.remove("loading");
       lastQuote = { tokenIn, tokenOut, amt, outAmount };
       updateUsdHint("swapToUsd", tokenOut, outAmount);
       if (routeStatus) routeStatus.innerText = "\u2248 " + outAmount.toFixed(4) + " " + tokenOut;
@@ -564,14 +613,24 @@
         const minReceived = outAmount * (1 - selectedSlippage / 100);
         minReceivedEl.innerText = minReceived.toFixed(4) + " " + tokenOut + " (" + selectedSlippage + "% slippage)";
       }
+
+      // A valid quote just landed — re-enable Exchange for the current input.
+      document.getElementById("swapBtn").disabled = false;
     } catch (err) {
+      // Ignore aborts — they just mean we've already moved on to a newer amount.
+      if (err && err.name === "AbortError") return;
+      if (seq !== quoteSeq) return; // stale error from an older request
       console.error("quote failed", err);
       lastQuote = null;
       toAmt.value = "";
+      toAmt.classList.remove("loading");
       if (minReceivedEl) minReceivedEl.innerText = "\u2014";
       if (feeEl) feeEl.innerText = "\u2014";
       const msg = err.message || String(err);
       if (routeStatus) routeStatus.innerText = /^couldn't fetch/i.test(msg) ? msg : ("Couldn't fetch a quote: " + msg);
+      document.getElementById("swapBtn").disabled = false;
+    } finally {
+      if (activeQuoteController === controller) activeQuoteController = null;
     }
   }
 

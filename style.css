@@ -207,6 +207,9 @@ main.app{ max-width:640px; margin:0 auto; padding:36px 16px 90px; }
   background:transparent; border:none; outline:none; color:var(--text);
   font-size:21px; font-weight:700; width:100%;
 }
+.field input.loading{
+  color:var(--muted); font-weight:600; font-size:17px; font-style:normal;
+}
 select{
   background:#22242b; color:var(--text); border:1px solid var(--border);
   border-radius:10px; padding:8px 12px; font-weight:700; font-size:13px; cursor:pointer;
